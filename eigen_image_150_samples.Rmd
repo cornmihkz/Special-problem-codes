@@ -1,0 +1,121 @@
+---
+title: "eigen_image_150_samples"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+*Calculating Principal Components using Covariance Method*
+```{r}
+# Algorithm to create the face space for projection
+# Center and scale the data
+scaled_images150 <-
+  scale(images_matrix150, center = TRUE, scale = TRUE)
+
+# column means and standard deviation
+mean_images150 <- attr(scaled_images150, "scaled:center")
+std_images150  <- attr(scaled_images150, "scaled:scale")
+
+
+# Calculate the covariance matrix. 
+covariance_matrix150 <- scaled_images150%*%t(scaled_images150) / (nrow(scaled_images150)-1)
+
+# computation of eigenvalues from covariance matrix
+# this corresponds to the pc of the data
+eigen_value_computed150 <- eigen(covariance_matrix150)
+eigenvalues150          <- eigen_value_computed150$values
+eigenvectors150         <- eigen_value_computed150$vectors
+
+
+# proportion of variation
+proportion_of_variation150  <- eigenvalues150 / sum(eigenvalues150)
+
+# cumulative sum of eigenvalues
+cumulative_sum_variation150 <- cumsum(eigenvalues150) / sum(eigenvalues150)
+
+# determines the number of eigenvalues to be preserved
+threshold_value150          <- min(which(cumulative_sum_variation150 > .90))
+
+# scaling factor
+# scaling_factor <- 
+#   diag(eigenvalues[1:threshold_value]^(-1/2)) / (sqrt(nrow(scaled_images150)-1))
+
+scaling_factor150 <- 
+  diag(1/(sqrt(eigenvalues150[1:threshold_value150]))) / (sqrt(nrow(scaled_images150)-1))
+
+# new matrix that represents the top 90% eigenvectors
+eigenimages150  <- t(scaled_images150)%*%eigenvectors150[,1:threshold_value150]%*%scaling_factor150
+
+
+
+# new projection
+# projecting the training images 
+# by the Covariance Matrix Method
+# this is now the PCA image space
+projected_data_covmat150 <- data.frame(PC = t(t(eigenimages150)%*%t(scaled_images150)))
+```
+
+```{r Normalized images ^mean-centered and scaled^}
+
+# mean_150images 
+imageShow(array(as.numeric(mean_images150), c(images_dim, images_dim, 3)))
+
+# std_150images
+imageShow(array(as.numeric(std_images150), c(images_dim, images_dim, 3)))
+
+# std_150images 
+imageShow(array(scaled_images150[151, ], c(images_dim, images_dim, 3)))
+
+
+# admin_150 
+imageShow(array(scaled_images150[1, ], c(images_dim, images_dim, 3)))
+
+
+# gate_150 
+imageShow(array(scaled_images150[151, ], c(images_dim, images_dim, 3)))
+
+
+# rootCrops_150 
+imageShow(array(scaled_images150[600, ], c(images_dim, images_dim, 3)))
+
+
+# malakasMaganda_150 
+imageShow(array(scaled_images150[301, ], c(images_dim, images_dim, 3)))
+
+```
+
+
+```{r Top three eigenImages 150 samples}
+
+# Projected Images
+# eigenimage 1
+eigenimage150_1 <- array(eigenimages150[, 1], c(images_dim, images_dim, 3))
+imageShow(eigenimage150_1)
+
+
+eigenimage150_2 <- array(eigenimages150[, 2], c(images_dim, images_dim, 3))
+imageShow(eigenimage150_2)
+
+
+eigenimage150_3 <- array(eigenimages150[, 3], c(images_dim, images_dim, 3))
+imageShow(eigenimage150_3)
+
+```
+
+
+```{r}
+svm_150_df <- data.frame(image_class = images_set_150[, 1],
+                         projected_data_covmat150)
+
+library(caret)
+library(e1071)
+
+svm150_tune.control <- tune.control(sampling = c("cross"))
+
+svm_150_caret <- svm(image_class ~ .,
+                          data = svm_150_df,
+                          type = "C-classification",
+                          kernel = "linear")
+
+```
+

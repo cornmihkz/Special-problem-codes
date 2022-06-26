@@ -1,0 +1,106 @@
+---
+title: "rf_200_samples"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r}
+set.seed(231)
+doParallel::registerDoParallel()
+
+landmarks200_rf200_spec <- 
+  rand_forest(
+      mtry  = tune(),
+      trees = 1000,
+      min_n = tune()
+    ) %>% 
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+
+
+```
+
+
+
+```{r}
+landmarks200_wf <-
+  workflow() %>%
+  add_recipe(landmarks200_rec) %>%
+  add_model(landmarks200_rf200_spec)
+
+# Tuning is faster in parallel
+all_cores <- parallel::detectCores(logical = FALSE)
+cl <- makeCluster(all_cores)
+doParallel::registerDoParallel(cl)
+```
+
+
+
+```{r}
+set.seed(234)
+landmarks200_folds <- vfold_cv(landmarks200_train)
+
+
+doParallel::registerDoParallel()
+set.seed(345)
+
+rf200_results <- 
+  tune_grid(
+  landmarks200_wf,
+  resamples = landmarks200_folds,
+  grid = 10
+)
+
+best_accuracy200 <- rf200_results %>% select_best("accuracy")
+```
+
+```{r}
+final_rf200 <- landmarks200_wf %>% 
+  finalize_workflow(select_best(rf200_results, "accuracy"))
+
+
+landmarks200_fit <- last_fit(final_rf200, landmarks200_split)
+
+
+rf200_final_ <- 
+  finalize_model(
+    landmarks200_rf200_spec,
+    best_accuracy200
+  )
+```
+
+```{r}
+rf200_final_wf <- 
+  workflow() %>%
+  add_recipe(landmarks200_rec) %>%
+  add_model(rf200_final_)
+
+
+rf200_final_results <-
+  rf200_final_wf %>%
+  last_fit(landmarks200_split)
+
+collect_metrics(rf200_final_results)
+
+rf200_final_results %>% collect_predictions()
+```
+
+```{r}
+rf200_final_results %>%
+  collect_predictions() 
+```
+
+```{r}
+rf200_final_results$.workflow[[1]] 
+
+rf200_final_results$.predictions
+  
+rf200_final_results$.metrics[[1]]
+```
+```{r}
+write.csv(data.frame(rf200_final_results$.predictions), "rf200_pred.csv", row.names = FALSE)
+```
+

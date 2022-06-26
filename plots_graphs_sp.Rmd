@@ -1,0 +1,117 @@
+---
+title: "plots_graphs_sp"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+
+
+
+svm150_accuracy <- 0.9868421
+svm200_accuracy <- 1
+svm250_accuracy <- 0.9880952
+
+rf150_accuracy <- 0.9802632
+rf200_accuracy <- 0.95
+rf250_accuracy <- 0.9365079
+
+svm150_roc_auc <- 0.9852839
+svm200_roc_auc <- 0.9951
+svm250_roc_auc <- 0.9881792
+
+rf150_roc_auc <- 0.9980956
+rf200_roc_auc <- 0.9981667
+rf250_roc_auc <- 0.9974805
+```
+
+
+```{r}
+accuracy_measures <- data.frame(lsvc = c(svm150_accuracy,
+                                        svm200_accuracy,
+                                        svm250_accuracy),
+                                rfc  = c(rf150_accuracy,
+                                        rf200_accuracy,
+                                        rf250_accuracy))
+
+
+roc_auc_measures <- data.frame(lsvc = c(svm150_roc_auc,
+                                       svm200_roc_auc,
+                                       svm250_roc_auc),
+                               rfc  = c(rf150_roc_auc,
+                                       rf200_roc_auc,
+                                       rf250_roc_auc))
+
+
+rownames(accuracy_measures) <- c("150perClass", "200perClass", "250perClass")
+
+rownames(roc_auc_measures) <- c("150perClass", "200perClass", "250perClass")
+
+
+
+accuracy_measures <- rownames_to_column(accuracy_measures, var = "sizePerClass")
+roc_auc_measures <- rownames_to_column(roc_auc_measures, var = "sizePerClass")
+
+
+```
+
+```{r}
+
+accuracy_measures %>%
+  pivot_longer(names_to = "classifier", 
+               values_to = "accuracy", 
+               cols = lsvc:rfc) %>%
+  ggplot(aes(sizePerClass, accuracy, shape = classifier)) +
+  geom_point(aes(color = classifier), size = 4) +
+  scale_y_continuous(limits = c(0.93, 1), labels = scales::percent) +
+  labs(y = "Accuracy",
+       x = "Samples per class") +
+  ggtitle("Accuracies of LSVC and RFC") +
+  geom_text(aes(label = scales::percent(round(accuracy, 4))),
+            check_overlap = TRUE,
+            vjust = 2) +
+  theme_classic()
+
+```
+
+
+```{r}
+
+roc_auc_measures %>%
+  pivot_longer(names_to = "classifier", 
+               values_to = "accuracy", 
+               cols = lsvc:rfc) %>%
+  ggplot(aes(sizePerClass, accuracy, shape = classifier, label = accuracy )) +
+  geom_point(aes(color = classifier), size = 4) +
+  scale_y_continuous(limits = c(0.98, 1), labels = scales::percent) +
+  labs(y = "ROC_AUC",
+       x = "Samples per class") +
+  ggtitle("Measures of Area under ROC curve of LSVC and RFC") +
+  geom_text(aes(label = scales::percent(round(accuracy, 4), accuracy = 0.01)),
+            check_overlap = TRUE,
+            vjust = 2) +
+  theme_classic()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

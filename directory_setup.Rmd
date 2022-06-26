@@ -1,0 +1,261 @@
+---
+title: "directory_setup"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Import libraries and set up file path}
+# library(tidyverse)
+library(OpenImageR)
+library(jpeg)
+library(EBImage)
+library(tidymodels)
+
+path_to_img <- "../data_for_tuning"
+  
+img_files <- 
+  list.files(
+    path_to_img,
+    all.files = TRUE,
+    full.names = TRUE, 
+    recursive = TRUE,
+    no.. = TRUE
+  )
+```
+
+```{r Processing images}
+# Set default image dimensions
+images_dim <- 65
+
+# Extract rgb from each image
+# Extract the individual color value matrices
+img_rgb <- function(rgb){
+  r <- as.vector(rgb[ , , 1])
+  g <- as.vector(rgb[ , , 2])
+  b <- as.vector(rgb[ , , 3])
+  
+  img_to_rgb <- t(c( r, g, b))
+  
+  return (img_to_rgb)
+}
+
+img_read <- function(img, images_dim, rgb_func = img_rgb){
+  image <- readJPEG(img)
+  read_img <-
+    resizeImage(
+       image,
+       width = images_dim,
+       height = images_dim,
+       method = 'nearest'
+     )
+
+  image <- as.numeric(rgb_func(read_img))
+  
+  return (image)
+}
+
+images_data <- NULL
+
+# function for image processing
+image_process <- 
+  function(image_files, 
+           images_data, 
+           rgb_func,
+           img_read, 
+           images_path,
+           images_dim){
+    
+    images_matrix  <- images_data
+    
+    for(img_file in image_files){
+      image_file  <- img_read(img_file, images_dim, rgb_func)
+
+      images_matrix  <- rbind(images_matrix, image_file)
+  
+    }
+    
+      rownames(images_matrix) <- list.files(images_path, recursive = TRUE)
+    
+    return(images_matrix)
+  }
+
+
+# converted all images into vectors
+# of RGB values 
+# concatenated into 1 * 12675 long vector
+# Creating the dataset
+image_data_matrix <-
+  image_process(img_files, 
+                images_data, 
+                img_rgb,
+                img_read, 
+                path_to_img,
+                images_dim)
+```
+
+```{r}
+# extract both names and class
+# cbind with image_data_matrix
+
+number_of_cols <- images_dim^2 * 3
+
+names_and_class <- matrix(0, nrow = length(img_files), ncol = 2)
+for(file in 1:length(img_files)){
+  
+  className <- unlist(strsplit(img_files[file], split = "/"))[[3]]
+  imgName   <- unlist(strsplit(img_files[file], split = "/"))[[4]]
+  
+  names_and_class[file, 1] <-  className
+  names_and_class[file, 2] <-  imgName
+}
+
+# merge image names and image class names
+# into the image data matrix
+merged_images_data <- cbind(names_and_class, 
+                            image_data_matrix)
+
+# write.table(merged_images_data, file = "images_data.txt", sep = " ; ")
+
+colnames(merged_images_data) <- c("image_class",
+                                  "image_names",
+                                  paste0(1:number_of_cols,
+                                         rep(" color_scheme", number_of_cols)))
+
+# all images in the from the dataset
+merged_images_data <- as_tibble(merged_images_data)
+```
+
+
+```{r Raw dataset 150 stratified}
+set.seed(326)
+images_150 <- 150
+
+images_set_150 <- merged_images_data %>%
+                    group_by(image_class) %>%
+                    sample_n(images_150)
+
+
+images_matrix_150 <- 
+  images_set_150[,-1:-2] %>% 
+  as.matrix()
+
+images_matrix150 <- apply(images_matrix_150, 2, as.numeric)
+
+
+
+##########################
+set.seed(123)
+
+landmarks150_split <- initial_split(images_set_150,
+                             strata = image_class)
+landmarks150_train <- training(landmarks150_split)
+landmarks150_test  <- testing(landmarks150_split)
+landmarks150_folds <- vfold_cv(landmarks150_train)
+
+set.seed(323)
+doParallel::registerDoParallel()
+landmarks150_rec <- 
+  recipe(image_class ~ .,
+        data = landmarks150_train) %>%
+        update_role(image_names, 
+                    new_role = "ID") %>%
+        step_integer(all_predictors()) %>%
+        step_normalize(all_predictors()) %>%
+        step_pca(all_predictors(), 
+                 threshold = .9,
+                 id = "pca")
+```
+
+
+```{r Raw dataset 200 stratified}
+set.seed(344)
+images_200 <- 200
+
+images_set_200 <- merged_images_data %>%
+                    group_by(image_class) %>%
+                    sample_n(images_200)
+
+
+images_matrix_200 <- 
+  images_set_200[,-1:-2] %>% 
+  as.matrix()
+
+images_matrix200 <- apply(images_matrix_200, 2, as.numeric)
+
+##########################
+
+set.seed(123)
+
+landmarks200_split <- initial_split(images_set_200,
+                             strata = image_class)
+landmarks200_train <- training(landmarks200_split)
+landmarks200_test  <- testing(landmarks200_split)
+landmarks200_folds <- vfold_cv(landmarks200_train)
+
+set.seed(323)
+doParallel::registerDoParallel()
+landmarks200_rec <- 
+  recipe(image_class ~ .,
+        data = landmarks200_train) %>%
+        update_role(image_names, 
+                    new_role = "ID") %>%
+        step_integer(all_predictors()) %>%
+        step_normalize(all_predictors()) %>%
+        step_pca(all_predictors(), 
+                 threshold = .9,
+                 id = "pca")
+```
+
+
+```{r Raw dataset 250 stratified}
+set.seed(342)
+images_250 <- 250
+
+images_set_250 <- merged_images_data %>%
+                    group_by(image_class) %>%
+                    sample_n(images_250)
+
+
+images_matrix_250 <- 
+  images_set_250[,-1:-2] %>% 
+  as.matrix()
+
+images_matrix250 <- apply(images_matrix_250, 2, as.numeric)
+
+
+##########################
+
+
+library(parallel)
+set.seed(123)
+
+landmarks250_split <- initial_split(images_set_250,
+                             strata = image_class)
+landmarks250_train <- training(landmarks250_split)
+landmarks250_test  <- testing(landmarks250_split)
+landmarks250_folds <- vfold_cv(landmarks250_train)
+
+
+set.seed(323)
+doParallel::registerDoParallel()
+landmarks250_rec <- 
+  recipe(image_class ~ .,
+        data = landmarks250_train) %>%
+        update_role(image_names, 
+                    new_role = "ID") %>%
+        step_integer(all_predictors()) %>%
+        step_normalize(all_predictors()) %>%
+        step_pca(all_predictors(), 
+                 threshold = .9,
+                 id = "pca")
+  
+
+# landmarks250_prep <- landmarks250_rec %>% prep()
+# landmarks250_bake <- landmarks250_prep %>% bake(new_data = NULL)
+```
+
+```{r}
+
+```
+

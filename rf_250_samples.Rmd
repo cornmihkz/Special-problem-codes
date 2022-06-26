@@ -1,0 +1,188 @@
+---
+title: "rf_250_samples"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+
+```{r}
+set.seed(231)
+doParallel::registerDoParallel()
+
+rf250_spec <- 
+  rand_forest(
+      mtry  = tune(),
+      trees = 1000,
+      min_n = tune()
+    ) %>% 
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+
+# Tuning is faster in parallel
+all_cores <- parallel::detectCores(logical = FALSE)
+cl <- makeCluster(all_cores)
+doParallel::registerDoParallel(cl)
+
+rf250_wf <-
+  workflow() %>%
+  add_recipe(landmarks250_rec) %>%
+  add_model(rf250_spec)
+
+
+set.seed(234)
+
+
+doParallel::registerDoParallel()
+set.seed(345)
+
+rf250_results <- 
+  tune_grid(
+  rf250_wf,
+  resamples = landmarks250_folds,
+  grid = 10
+)
+
+best_accuracy250 <- rf250_results %>% select_best("accuracy")
+```
+
+```{r}
+all_cores <- parallel::detectCores(logical = FALSE)
+cl <- makeCluster(all_cores)
+doParallel::registerDoParallel(cl)
+
+final_rf250 <- rf250_wf %>% 
+  finalize_workflow(select_best(rf250_results, "accuracy"))
+
+
+rf250_last_fit <- last_fit(final_rf250, landmarks250_split)
+
+
+rf250_final_ <- 
+  finalize_model(
+    rf250_spec,
+    best_accuracy250
+  )
+
+
+
+doParallel::registerDoParallel(cl)
+rf250_final_wf <- 
+  workflow() %>%
+  add_recipe(landmarks250_rec) %>%
+  add_model(rf250_final_)
+
+
+doParallel::registerDoParallel(cl)
+set.seed(123)
+rf250_final_results <-
+  rf250_final_wf %>%
+  last_fit(landmarks250_split)
+
+collect_metrics(rf250_final_results)
+
+rf250_final_results %>% collect_predictions()
+```
+
+```{r}
+rf250_final_results %>%
+  collect_predictions() 
+
+rf250_final_results$.workflow[[1]] 
+
+rf250_final_results$.predictions
+  
+rf250_final_results$.metrics[[1]]
+```
+
+```{r}
+write.csv(data.frame(rf250_final_results$.predictions), "rf250_pred.csv", row.names = FALSE)
+```
+
+
+
+
+
+```{r}
+library(parallel)
+
+doParallel::registerDoParallel()
+set.seed(342)
+
+svm250_linear_tune <-
+  svm_linear(
+    cost = tune()
+  ) %>%
+  set_mode("classification") %>%
+  set_engine("kernlab")
+
+svm250_grid <- 
+  expand.grid(cost = c(0.25, 0.5, 0.75, 1, 1.25, 1.5))
+
+
+svm250_linear_wf <-
+  workflow() %>%
+  add_recipe(landmarks250_rec) %>%
+  add_model(svm250_linear_tune)
+
+
+
+svm_250_results <-
+   tune_grid(
+      svm250_linear_wf,
+      resamples = landmarks250_folds,
+      grid = svm250_grid
+  )
+
+svm250_best_accuracy <- svm_250_results %>% select_best("accuracy")
+
+svm_250_results %>% 
+  collect_metrics() %>%
+  arrange(desc(mean))
+
+final_svm250 <- svm250_linear_wf %>% 
+  finalize_workflow(select_best(svm_250_results, "accuracy"))
+
+
+# svm250_fit <- last_fit(final_svm250, landmarks250_split)
+
+
+svm250_final_ <- 
+  finalize_model(
+    svm250_linear_tune,
+    svm250_best_accuracy
+  )
+
+
+svm250_final_wf <- 
+  workflow() %>%
+  add_recipe(landmarks250_rec) %>%
+  add_model(svm250_final_)
+
+
+svm_250_final_result <-
+  svm250_final_wf %>% 
+  last_fit(landmarks250_split)
+
+
+svm_250_final_result %>% collect_metrics()
+```
+
+```{r}
+svm_250_final_result$.workflow[[1]]
+
+svm_250_final_result$.predictions
+  
+svm_250_final_result$.metrics[[1]]
+
+write.csv(data.frame(svm_250_final_result$.predictions), "svm250_pred.csv", row.names = FALSE)
+```
+
+```{r}
+
+```
+
+
+

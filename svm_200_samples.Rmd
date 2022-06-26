@@ -1,0 +1,97 @@
+---
+title: "svm_200_samples"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r setup, include=FALSE}
+library(parallel)
+
+doParallel::registerDoParallel()
+set.seed(342)
+
+svm200_linear_tune <-
+  svm_linear(
+    cost = tune()
+  ) %>%
+  set_mode("classification") %>%
+  set_engine("kernlab")
+
+svm200_grid <- expand.grid(cost = c(0.25, 0.5, 0.75, 1, 1.25, 1.5))
+
+svm200_linear_wf <-
+  workflow() %>%
+  add_recipe(landmarks200_rec) %>%
+  add_model(svm200_linear_tune)
+
+# Tuning is faster in parallel
+all_cores <- parallel::detectCores(logical = FALSE)
+cl <- makeCluster(all_cores)
+doParallel::registerDoParallel(cl)
+
+svm_200_results <-
+   tune_grid(
+      svm200_linear_wf,
+      resamples = landmarks200_folds,
+      grid = svm200_grid
+  )
+```
+
+
+```{r}
+svm200_best_accuracy <- svm_200_results %>% select_best("accuracy")
+
+svm_200_results %>% 
+  collect_metrics() %>%
+  arrange(desc(mean))
+
+final_svm200 <- svm200_linear_wf %>% 
+  finalize_workflow(select_best(svm_200_results, "accuracy"))
+
+
+# svm200_fit <- last_fit(final_svm200, landmarks200_split)
+
+
+svm200_final_ <- 
+  finalize_model(
+    svm200_linear_tune,
+    svm200_best_accuracy
+  )
+
+
+svm200_final_wf <- 
+  workflow() %>%
+  add_recipe(landmarks200_rec) %>%
+  add_model(svm200_final_)
+
+
+svm_200_final_result <-
+  svm200_final_wf %>% 
+  last_fit(landmarks200_split)
+
+
+svm_200_final_result %>% collect_metrics()
+```
+
+```{r}
+svm_200_final_result$.workflow[[1]]
+
+svm_200_final_result$.predictions
+
+svm_200_final_result$.metrics
+```
+
+```{r}
+write.csv(data.frame(svm_200_final_result$.predictions), "svm200_pred.csv", row.names = FALSE)
+```
+
+```{r}
+svm200_fitobj <- pull_workflow_fit(svm200_final_wf)$fit
+
+svm200_coef   <- svm200_fitobj@coef[[1]]
+
+svm200_mat    <- svm200_fitobj@xmatrix[[1]]
+
+svm200_varimp <- svm200_coef %*% svm200_mat
+```
+

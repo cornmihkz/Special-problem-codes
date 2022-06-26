@@ -1,0 +1,101 @@
+---
+title: "eigen_image_250_samples"
+author: "Mihkail Cornell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+*Calculating Principal Components using Covariance Method*
+```{r setup, include=FALSE}
+
+# Algorithm to create the face space for projection
+# Center and scale the data
+scaled_images250 <-
+  scale(images_matrix250, center = TRUE, scale = TRUE)
+
+# column means and standard deviation
+mean_images250 <- attr(scaled_images250, "scaled:center")
+std_images250  <- attr(scaled_images250, "scaled:scale")
+
+
+# Calculate the covariance matrix. 
+covariance_matrix250 <- scaled_images250%*%t(scaled_images250) / (nrow(scaled_images250)-1)
+
+# computation of eigenvalues from covariance matrix
+# this corresponds to the pc of the data
+eigen_value_computed250 <- eigen(covariance_matrix250)
+eigenvalues250          <- eigen_value_computed250$values
+eigenvectors250         <- eigen_value_computed250$vectors
+
+
+# proportion of variation
+proportion_of_variation250  <- eigenvalues250 / sum(eigenvalues250)
+
+# cumulative sum of eigenvalues
+cumulative_sum_variation250 <- cumsum(eigenvalues250) / sum(eigenvalues250)
+
+# determines the number of eigenvalues to be preserved
+threshold_value250          <- min(which(cumulative_sum_variation250 > .90))
+
+# scaling factor
+# scaling_factor <- 
+#   diag(eigenvalues[1:threshold_value]^(-1/2)) / (sqrt(nrow(scaled_images250)-1))
+
+scaling_factor250 <- 
+  diag(1/(sqrt(eigenvalues250[1:threshold_value250]))) / (sqrt(nrow(scaled_images250)-1))
+
+# new matrix that represents the top 90% eigenvectors
+eigenimages250  <- t(scaled_images250)%*%eigenvectors250[,1:threshold_value250]%*%scaling_factor250
+
+# new projection
+# projecting the training images 
+# by the Covariance Matrix Method
+# this is now the PCA image space
+projected_data_covmat250 <- data.frame(PC = t(t(eigenimages250)%*%t(scaled_images250)))
+```
+
+```{r Normalized 250 images ^mean-centered and scaled^}
+
+# mean_250images 
+imageShow(array(as.numeric(mean_images250), c(images_dim, images_dim, 3)))
+
+
+# std_250images
+imageShow(array(as.numeric(std_images250), c(images_dim, images_dim, 3)))
+
+# admin_200 
+imageShow(array(scaled_images200[1, ], c(images_dim, images_dim, 3)))
+
+
+# gate_250 
+imageShow(array(scaled_images200[251, ], c(images_dim, images_dim, 3)))
+
+
+# malakasMaganda_250
+imageShow(array(scaled_images200[501, ], c(images_dim, images_dim, 3)))
+
+
+#  rootCrops_250 
+imageShow(array(scaled_images200[701, ], c(images_dim, images_dim, 3)))
+
+```
+
+
+
+
+```{r}
+
+eigenimage250_1 <- array(eigenimages250[, 1], c(images_dim, images_dim, 3))
+imageShow(eigenimage250_1)
+
+
+eigenimage250_2 <- array(eigenimages250[, 2], c(images_dim, images_dim, 3))
+imageShow(eigenimage250_2)
+
+
+eigenimage250_3 <- array(eigenimages250[, 3], c(images_dim, images_dim, 3))
+imageShow(eigenimage250_3)
+
+```
+
